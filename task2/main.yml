@@ -1,0 +1,41 @@
+---
+- name: "fetching instance details"
+  become: false
+  hosts: localhost
+  vars:
+    region: "eu-central-1" # Change to your region
+    asg_name: "web-lc-20231103045624218600000001-asg" #Change to your autoscalling group name
+  tasks:
+    - name: "gathering instance details"
+      ec2_instance_info:
+        region: "{{ region }}"
+        filters:
+          "tag:aws:autoscaling:groupName": "{{ asg_name }}"
+          instance-state-name: ["running"]
+      register: instance_details
+    - name: "creating dynamic inventory"
+      add_host:
+        groups: "asg_instances"
+        hostname: "{{ item.public_ip_address }}"
+        ansible_ssh_user: "ubuntu" # Change to your username
+        ansible_ssh_host: "{{ item.public_ip_address }}"
+        ansible_ssh_port: "22"
+        ansible_ssh_private_key_file: "devops.pem" # Change to your key
+        ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
+      loop: "{{ instance_details.instances }}"
+
+- name: "Test Project"
+  hosts: all
+  become: true
+  serial: 1
+  vars:
+    packages:
+      - docker.io
+      - docker-compose
+      - git
+      - npm
+  tasks:
+    - name: "installing packages"
+      apt:
+        name: "{{ packages }}"
+        state: present
